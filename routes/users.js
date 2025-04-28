@@ -15,7 +15,7 @@ function generateAccessToken (userData) {
 };
 
 function generateRefreshToken (userData) {
-    return jwr.sign( userData, process.env.JWT_SECRET_REFRESH_KEY, {expiresIn : '1y'} );
+    return jwt.sign( userData, process.env.JWT_SECRET_REFRESH_KEY, {expiresIn : '1y'} );
 };
 
 
@@ -25,12 +25,12 @@ function generateRefreshToken (userData) {
 router.post('/register', function(req, res, next){
     
     // Vérifie si un param est manquant
-    if(!checkBody(req.body, ['email','password','fisrtname','lastname','username','phone'])){
+    if(!checkBody(req.body, ['email','password','firstname','lastname','username','phone'])){
         res.json({result : false, error : 'Un ou plusieurs champs manquants ou vides'});
         return;
     }
 
-    const {email, password, firstname, lastname, phone} = req.body;
+    const {email, password, firstname, lastname, phone, username} = req.body;
 
     // Vérifie si le user existe déjà
     User.findOne({email}).then(data => {
@@ -114,7 +114,7 @@ router.post ('/logout', authenticateToken, async (req, res, ) => {
 router.post('/refreshToken', async(req, res) => {
     
     // Vérifie que le refreshtoken est dans le request body
-    const refreshToken = req.body.refreshtoken;
+    const refreshToken = req.body.refreshToken;
 
     // Si pas de token, reourne une erreur
     if(!refreshToken) return res.status(401).json({error: 'Accès Refusé'});
