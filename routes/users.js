@@ -7,8 +7,8 @@ const { checkBody } = require('../modules/checkBody.js');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const authenticateToken = require('../middlewares/authMiddleware.js');
-const { refresh } = require('less');
-const { message } = require('antd');
+
+const {rolePermissions, hasPermission, getPermissionsForRole, getAllRoles} = require('../config/roles.js')
 const { requireRole, requirePermission, hasPermission } = require('../middlewares/roleMiddleware.js');
 
 
@@ -194,7 +194,7 @@ router.get('/:userId', authenticateToken, requirePermission('manage_users'), asy
 
 // MAJ d'un USER - nécessite la permission "manage_users"
 //PUT
-router.put('/:userId', authentificateToken, requirePermission('manage_users'), async (req, res) => {
+router.put('/:userId', authenticateToken, requirePermission('manage_users'), async (req, res) => {
     try {
         const { userId } = req.params;
         const { firstname, lastname, phone, username, email } = req.body;

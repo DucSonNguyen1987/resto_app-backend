@@ -1,69 +1,82 @@
+/**
+ * Configuration du système de rôles et permissions
+ * Définit:
+ * Les permissions de bases communes à tous les rôles
+ * Les permissions spécifiques à chaque rôle
+ * Des fonctions utilitaires pour vérifier et gérer les permissions
+ */
+
+
+
+// Définition des permissions de base accordées à tous les rôles
+const basePermissions = ['view_website', 'view_catalog', 'edit_profile'];
+
+// Définition de toutes les permissions valides du système
+
+const allValidPermissions = [
+
+    // Permissions de base
+    ...basePermissions,
+
+    // Permissions de réservation
+    'view_reservations',
+    'create_reservation',
+    'edit_reservation',
+    'cancel_reservation',
+
+    // Permissions de commande
+    'create_order',
+    'edit_order',
+    'cancel_order',
+
+    // Permissions de catalogue / menu
+    'create_catalog_item',
+    'edit_catalog_item',
+    'delete_catalog_item',
+
+    // Permissions de gestion de salle
+    'move_tables',
+    'edit_floor_plan',
+    'create_floor_plan',
+
+    // Permissions administratives
+    'manage_users',
+    'all_permissions'
+];
+
+// Définition des permissions spécifiques à chaque rôle
 
 const rolePermissions = {
-    ADMIN: [
-        // Consultation
-        'view_website',
-        'view_catalog',
-        'edit_profile',
-        // Réservations
-        'view_reservations',
-        'create_reservation',
-        'edit_reservation',
-        'cancel_reservation',
-        // Commandes
-        'create_order',
-        'edit_order',
-        'cancel_order',
-        // Menu
-        'create_catalog_item',
-        'edit_catalog_item',
-        'delete_catalog_item',
-        // Plan de salle
-        'move_tables',
+    ADMIN : ['all_permissions'],
+    OWNER :[
+        
+        // Gestion des USERS
+        'manage_users',
+        
+        // Gestion du plan de salle
         'edit_floor_plan',
         'create_floor_plan',
-        // Users
-        'manage_users',
-        // God mode
-        'all_permissions'  // l'admin peut tout faire
-    ],
-    OWNER : [
-        // Permissions explicites du OWNER
-            
-            // Plan de salle
-            'edit_floor_plan',
-            'create_floor_plan',
-            
-            // Users
-            'manage_users',
-            
-        // Permissions héritées
+        
+        // Catalogue / menu
+        'create_catalog_item',
+        'edit_catalog_item',
+        'delete_catalog_item',
 
-            // Consultation
-            'view_website',
-            
-            // Menu
-            'view_catalog',
-            'create_catalog_item',
-            'edit_catalog_item',
-            'delete_catalog_item',
-            
-            // Réservations
-            'view_reservations',
-            'cancel_reservation',
+        // Réservations
+        'view_reservations',
+        'cancel_reservation',
 
-            // Commandes
-            'create_order',
-            'edit_order',
-            'cancel_order',
+        // Commandes
+        'create_order',
+        'edit_order',
+        'cancel_order',
 
-            // changement de table
-            'move_tables'
+        // Tables
+        'move_tables'
     ],
     MANAGER : [
-       // Permissions explicites du MANAGER
-        
-       // Menu
+
+        // Menu & Catalogue
         'create_catalog_item',
         'edit_catalog_item',
         'delete_catalog_item',
@@ -73,45 +86,40 @@ const rolePermissions = {
         'edit_order',
         'cancel_order',
 
-        // changement de tables
+        // Tables
         'move_tables',
 
         // Plan de salle
         'edit_floor_plan',
 
-        // Permissions héritées
-
-            // Consultation
-            'view_website',
-            'view_catalog',
-            'edit_profile',
-            'view_reservations'
-
+        // Réservations
+        'view_reservations'
     ],
     STAFF : [
-       // Permissions explicites de STAFF
-            // Reservations
-                'view_reservations',
-            
-            // Commandes
-            'create_order',
-            'edit_order',
 
-        // Permissions de base
-        'view_website',
-        'view_catalog',
-        'edit_profile'
+        // Réservations
+        'view_reservations',
+
+        // Commandes
+        'create_order',
+        'edit_order'
     ],
     USER : [
-        // Permissions explicites de USER
-        'view_website',
-        'view_catalog',
-        'edit_profile',
+        // Réservations
         'create_reservation',
         'edit_reservation',
         'cancel_reservation'
     ]
+};
 
+// Ajouter automatiquement les permissions de base à chaque rôle
+Object.keys(rolePermissions).forEach( role => {
+    rolePermissions[role] = [...basePermissions, ...rolePermissions[role]];
+});
+
+// Check si une permission est valide dans le système
+const isValidPermission = (permission) => {
+    return allValidPermissions.includes(permission);
 };
 
 
@@ -120,12 +128,17 @@ const hasPermission = (role, permission) => {
     if(!role || !rolePermissions[role]){
         return false
     }
-
-    // Si le rôle est ADMIN, il a toutes les permissions
-    if (role === 'ADMIN') {
+    // Check si la permission est valide
+    if(!isValidPermission(permission)){
+        console.warn(`Permission invalide demandée : ${permission}`);
+        return false;
+    } 
+    // Si le rôle a la permission all_permissions, accorder tous les droits
+    if (rolePermissions[role].includes('all_permissions')) {
         return true;
     }
 
+    // Sinon, vérifie si la permission est dans la liste des permissions du rôle
     return rolePermissions[role].includes(permission);
 };
 
@@ -140,9 +153,26 @@ const getPermissionsForRole = (role) => {
 // Obtenir tous les rôles disponibles
 const getAllRoles = () => Object.keys(rolePermissions);
 
+// Vérifie s un rôle existe dans le système
+const isValidRole = (role) => {
+    return getAllRoles().includes(role);
+};
+
+// Vérifie si un USER a accès à une fonctionnalité qui nécessite une permission spécifique
+
+const checkAccess = (user, permission) => {
+    if(!user || !user.role) {
+        return false;
+    }
+    return hasPermission(user.role, permission);
+};
+
 module.exports = {
     rolePermissions,
     hasPermission,
     getPermissionsForRole,
-    getAllRoles
+    getAllRoles,
+    isValidRole,
+    isValidPermission,
+    checkAccess
 };
