@@ -38,6 +38,7 @@ const allValidPermissions = [
     'move_tables',
     'edit_floor_plan',
     'create_floor_plan',
+    'view_floor_plan',
 
     // Permissions administratives
     'manage_users',
@@ -53,9 +54,11 @@ const rolePermissions = {
         // Gestion des USERS
         'manage_users',
         
-        // Gestion du plan de salle
+        // Permissions de gestion de salle
+        'move_tables',
         'edit_floor_plan',
         'create_floor_plan',
+        'view_floor_plan',
         
         // Catalogue / menu
         'create_catalog_item',
@@ -70,9 +73,7 @@ const rolePermissions = {
         'create_order',
         'edit_order',
         'cancel_order',
-
-        // Tables
-        'move_tables'
+        
     ],
     MANAGER : [
 
@@ -91,6 +92,7 @@ const rolePermissions = {
 
         // Plan de salle
         'edit_floor_plan',
+        'view_floor_plan',
 
         // Réservations
         'view_reservations'
@@ -102,13 +104,20 @@ const rolePermissions = {
 
         // Commandes
         'create_order',
-        'edit_order'
+        'edit_order',
+
+        // Plan de salle
+        'view_floor_plan',
+        'move_tables'
     ],
     USER : [
         // Réservations
         'create_reservation',
         'edit_reservation',
-        'cancel_reservation'
+        'cancel_reservation',
+
+        // Pllan de salle
+        'view_floor_plan'
     ]
 };
 
