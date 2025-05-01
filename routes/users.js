@@ -9,7 +9,7 @@ const bcrypt = require('bcryptjs');
 const authenticateToken = require('../middlewares/authMiddleware.js');
 
 const {rolePermissions, hasPermission, getPermissionsForRole, getAllRoles} = require('../config/roles.js')
-const { requireRole, requirePermission, hasPermission } = require('../middlewares/roleMiddleware.js');
+const { requireRole, requirePermission } = require('../middlewares/roleMiddleware.js');
 
 
 function generateAccessToken(userData) {
@@ -78,15 +78,37 @@ router.post('/login', async (req, res, next) => {
         return res.status(401).send('Error : Non autorisé');
     }
 
+    // Vérifier si 2FA est activé pour les ADMIN ou OWNER
+    if (foundUser.twoFactorEnabled && (foundUser.role === 'ADMIN' || foundUser.role === 'OWNER')) {
+        // Générer un token temporaire pour la vérification 2FA
+        const tempToken = jwt.sign(
+            {userId: foundUser._id},
+            process.env.JWT.SECRET.KEY,
+            { expiresIn: '5m'}
+        );
+
+        // Stocker le tempToken
+        foundUser.tempToken = tempToken;
+        await foundUser.save();
+
+        // Renvoyer un état indiquant que le 2FA est nécessaire
+        return res.json({
+            result: true,
+            requires2FA: true,
+            tempToken: tempToken,
+            message: 'Veuillez compléter l\'authentification à deux facteurs'
+        });
+    }
+
     // Génère les token et MAJ user dans la DB
-    const { username, firstname, lastname, phone } = foundUser;
-    const accessToken = generateAccessToken({ email, firstname, lastname, username, phone })
+    const { username, firstname, lastname, phone, role } = foundUser;
+    const accessToken = generateAccessToken({ email, firstname, lastname, username, phone, role })
     const refreshToken = generateRefreshToken({ email });
     foundUser.accessToken = accessToken;
     foundUser.refreshToken = refreshToken;
     const result = await foundUser.save();
     // Send Response with user data
-    res.json({ result: true, data: { username, email, firstname, lastname, phone, accessToken, refreshToken } });
+    res.json({ result: true, data: { username, email, firstname, lastname, phone, role, accessToken, refreshToken } });
 });
 
 

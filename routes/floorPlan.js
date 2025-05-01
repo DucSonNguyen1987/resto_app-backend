@@ -1,9 +1,9 @@
-const express = requre ('express');
+const express = require ('express');
 const router = express.Router();
 
 // Modèles
 const FloorPlan = require ('../models/floorPlan.js');
-const Table = requre('../models/tables.js');
+const Table = require('../models/tables.js');
 
 // Middlewares
 const authentificateToken = require ('../middlewares/authMiddleware.js');
@@ -36,7 +36,7 @@ router.get('/', authentificateToken, requirePermission('view_floor_plan'), async
  * Nécessite: view_floor_plan
 */
 
-router.get('/flooPlanId', authentificateToken, requirePermission('view_floor_plan'), async(req, res)=> {
+router.get('/:flooPlanId', authentificateToken, requirePermission('view_floor_plan'), async(req, res)=> {
     try {
         const { floorPlanId} = req.params;
 
@@ -79,7 +79,7 @@ router.post('/', authentificateToken, requirePermission('create_floor_plan'), as
         const { name, description, dimensions, obstacles, status} = req.body;
 
         // Vérifier si le nom du plan n'existe pas déjà
-        const existingPlan = await FloorPlan.find({name});
+        const existingPlan = await FloorPlan.findOne({name});
 
         if(existingPlan) {
             return res.status(400).json({ result :false , error : 'Ce nom de plan exsite déjà'});
@@ -97,7 +97,7 @@ router.post('/', authentificateToken, requirePermission('create_floor_plan'), as
         });
 
         // Sauver le plan dans la DB
-        await FloorPlan.save();
+        await newFloorPlan.save();
 
         res.status(201).json({
             result: true,
@@ -266,7 +266,7 @@ router.patch('/:floorPlanId/status', authentificateToken, requirePermission('edi
  * Necessite 'exit_floor_plan'
 */
 
-router.post('//:floorPlanId/obstacles', authentificateToken, requirePermission('edit_floor_plan'), async(req, res) => {
+router.post('/:floorPlanId/obstacles', authentificateToken, requirePermission('edit_floor_plan'), async(req, res) => {
     try {
         const {floorPlanId} = req.params;
         const { obstacles} = req.body;

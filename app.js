@@ -12,6 +12,7 @@ const userRouter = require ('./routes/users');
 const floorPlanRouter = require ('./routes/floorPlan.js');
 const tableRouter = require('./routes/tables.js');
 const tableReservationRouter = require('./routes/tableReservation.js');
+const twoFactorAuthRoutes = require('./routes/twoFactorAuth.js');
 
 const app = express();
 app.use(cors());
@@ -25,9 +26,21 @@ app.use(helmet());
 
 //app.use('/', indexRouter);
 app.use('/users', userRouter);
-app.use('/floor-plans', floorPlanRouter);
-app.use('/tables', tableRouter);
-app.use('/reservations', tableReservationRouter);
+//app.use('/floor-plans', floorPlanRouter);
+//app.use('/tables', tableRouter);
+//app.use('/reservations', tableReservationRouter);
+app.use('/2fa', twoFactorAuthRoutes)
 
+// Gestion d'erreur
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ result :false, error: 'Une erreur est survenue'})
+})
+
+// Démarrage du serveur
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+    console.log(`Serveur démarré sur le port ${port}`);
+})
 
 module.exports = app;

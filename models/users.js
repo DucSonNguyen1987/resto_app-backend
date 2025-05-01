@@ -13,6 +13,22 @@ const userSchema = mongoose.Schema({
     role: {
         type : String,
         enum: ['ADMIN', 'OWNER', 'MANAGER', 'STAFF', 'USER']
+    },
+    twoFactorSecret : {
+        type : String,
+        default : null
+    },
+    twoFactorEnable : {
+        type : Boolean,
+        default: null
+    },
+    twoFactorBackupCodes : {
+        type: [String],
+        default: []
+    },
+    tempToken :{
+        type: String,
+        default: null
     }
 });
 

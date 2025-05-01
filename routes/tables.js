@@ -4,7 +4,7 @@ const router = express.Router();
 // Modèles
 const Table = require('../models/tables.js');
 const FloorPlan = require('../models/floorPlan.js');
-const TableReservation = require('../models/TableTablereservations.js');
+const TableReservation = require('../models/Tablereservations.js');
 
 // middlewares
 const authenticateToken = require('../middlewares/authMiddleware.js');
@@ -33,7 +33,7 @@ router.get('/', authenticateToken, requirePermission('view_floor_plan'), async (
         }
 
         if (minCapacity && !isNaN(parseInt(minCapacity))) {
-            FileSystemEntry.capacity = { $gte: parseInt(minCapacity) };
+            filter.capacity = { $gte: parseInt(minCapacity) };
         }
 
         // Récupérer les tables avec les filtres
@@ -209,7 +209,7 @@ router.put('/:tableId', authenticateToken, requirePermission('edit_floor_plan'),
  * Necessite 'edit_floor_plan'
 */
 
-router.delete('/:tableId', authenticateToken, require('edit_floor_plan'), async(req, res) => {
+router.delete('/:tableId', authenticateToken, requirePermission('edit_floor_plan'), async(req, res) => {
     try {
         const { tableId} = req.params;
 
@@ -217,7 +217,7 @@ router.delete('/:tableId', authenticateToken, require('edit_floor_plan'), async(
         const table = await Table.findById(tableId);
 
         if(!table) {
-            return res.stauts(404).json({ result: false, error: 'Table non trouvée'})
+            return res.status(404).json({ result: false, error: 'Table non trouvée'})
         }
 
         // Check si la table a des reservations à venir
@@ -238,7 +238,7 @@ router.delete('/:tableId', authenticateToken, require('edit_floor_plan'), async(
         }
 
         // Supprimer la table
-        await Table.findByIdAndDelelete(tableId);
+        await TTable.findByIdAndDelete(tableId);
 
         res.json ({
             result: true,
@@ -305,7 +305,7 @@ router.patch('/:tableID:position', authenticateToken, requirePermission('move_ta
  * Necessite 'edit_reservation'
  */
 
-router;patch('/:tableId/stauts', authenticateToken, requirePermission('edit_reservation'), async(req, res) => {
+router.patch('/:tableId/stauts', authenticateToken, requirePermission('edit_reservation'), async(req, res) => {
     try {
         const {tableId} = req.params;
         const {status} = req.body;
@@ -322,7 +322,7 @@ router;patch('/:tableId/stauts', authenticateToken, requirePermission('edit_rese
         const table = await Table.findById(tableId);
 
         if(!table) {
-            return res.stauts(404).json({ result: false, error: 'Table non trouvée'})
+            return res.status(404).json({ result: false, error: 'Table non trouvée'})
         }
 
         // MAJ du statut

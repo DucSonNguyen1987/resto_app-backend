@@ -44,7 +44,7 @@ const floorPlanSchema = mongoose.Schema({
         default : 'draft'
     },
     createdBy : {
-        type :monggose.Schema.Types.ObjectId,
+        type :mongoose.Schema.Types.ObjectId,
         ref: 'User',
     },
     obstacles : [{

@@ -2,9 +2,9 @@ const express= require ('express');
 const router = express.Router();
 
 // Modèles 
-const TableReservation = requre('../models/Tablereservations.js');
+const TableReservation = require('../models/Tablereservations.js');
 const Table = require ('../models/tables.js');
-const User = requre ('../models/users.js');
+const User = require ('../models/users.js');
 
 // Middlewares
 const authenticateToken = require('../middlewares/authMiddleware.js');
@@ -83,7 +83,7 @@ router.get('/:reservationId', authenticateToken, async(req, res) => {
     try {
         const {reservationId} = req.params;
 
-        const reservation = await TableReservation.finById(reservationId)
+        const reservation = await TableReservation.findById(reservationId)
         .populate ('user', 'username firstname lastname email phone')
         .populate ('tables', 'number capacity status')
         .populate ('floorPlan', 'name')

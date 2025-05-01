@@ -1,4 +1,3 @@
-import { message } from 'antd';
 
 const mongoose = require ('mongoose');
 
@@ -106,7 +105,7 @@ tableReservationSchema.pre('save', async function(next) {
     const conflictingReservations = await TableReservation.find ({
         _id: {$ne: this._id},                           // Exclure la réservation actuelle
         tables : {$in: this.tables},                    // Au moins une table en commun
-        status :{$in: ['pending', 'onfirmed']},         // Ne vérifier que les réservations actives
+        status :{$in: ['pending', 'confirmed']},         // Ne vérifier que les réservations actives
         $or : [
             // Début de nouvelle réservation pendant une existante
             {startTime: {$lte : this.startTime}, endTime: {$gte : this.startTime}},
