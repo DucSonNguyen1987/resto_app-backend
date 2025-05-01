@@ -36,7 +36,7 @@ router.get('/', authentificateToken, requirePermission('view_floor_plan'), async
  * Nécessite: view_floor_plan
 */
 
-router.get('/:flooPlanId', authentificateToken, requirePermission('view_floor_plan'), async(req, res)=> {
+router.get('/:floorPlanId', authentificateToken, requirePermission('view_floor_plan'), async(req, res)=> {
     try {
         const { floorPlanId} = req.params;
 
@@ -105,7 +105,7 @@ router.post('/', authentificateToken, requirePermission('create_floor_plan'), as
             data :newFloorPlan
         });
     } catch( error) {
-        consslor.error('Erreur lors de la création du plan de salle:', error);
+        console.error('Erreur lors de la création du plan de salle:', error);
         res.status(500).json({ result : false, error: 'Erreur serveur'})
     }
 });
@@ -116,7 +116,7 @@ router.post('/', authentificateToken, requirePermission('create_floor_plan'), as
  * Nécessite: 'edit_floor_plan'
 */
 
-router.put('/floorPlanId', authentificateToken, requirePermission('edit_floor_plan'), async(req, res) => {
+router.put('/:floorPlanId', authentificateToken, requirePermission('edit_floor_plan'), async(req, res) => {
     try {
         const {floorPlanId} = req.params;
         const { name, description, dimensions, obstacles, status} = req.body;
@@ -134,7 +134,7 @@ router.put('/floorPlanId', authentificateToken, requirePermission('edit_floor_pl
 
         // Si le nom est changé, verifier qu'il ne soit pas déjà pris
         if (name && name !== floorPlan.name) {
-            const existingPlan = await FloorPlan.findOne({neame, _id: {$ne : floorPlanId}});
+            const existingPlan = await FloorPlan.findOne({name, _id: {$ne : floorPlanId}});
             if(existingPlan) {
                 return res.status(400).json({ result : false, error :'Ce nom de plan existe déjà'});
             }
@@ -188,7 +188,7 @@ router.delete('/:floorPlanId', authentificateToken, requirePermission('edit_floo
 
         // Vérifier si le plan  a des tables associées
 
-        const tablesCount = await Table.countDocument( {floorPlan: floorPlanId});
+        const tablesCount = await Table.countDocuments( {floorPlan: floorPlanId});
 
         if( tablesCount > 0 ) {
             return res.status(400).json({
@@ -272,7 +272,7 @@ router.post('/:floorPlanId/obstacles', authentificateToken, requirePermission('e
         const { obstacles} = req.body;
 
         // Vérifier les données
-        if(!obstacles || Array.isArray(obstacles)) {
+        if(!obstacles || !Array.isArray(obstacles)) {
             return res.status(400).json({ result :false, error : 'Format d\'obstacle invalide'});
         }
 

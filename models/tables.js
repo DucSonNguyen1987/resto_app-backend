@@ -68,7 +68,7 @@ const tableSchema = mongoose.Schema({
         type: Date,
         default : Date.now
     }
-}, {Timestamps : true});
+}, {timestamps : true});
 
 // Création d'un index pour assurer l'unicité des numéros de tables au sein du même plan
 tableSchema.index ({ number : 1, floorPlan: 1}, {unique: true});

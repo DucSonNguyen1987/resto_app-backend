@@ -7,7 +7,15 @@ const authenticateToken = require ('../middlewares/authMiddleware');
 const jwt = require ('jsonwebtoken');
 const {checkBody} = require ('../modules/checkBody.js');
 const User = require('../models/users');
-const { default: generateCalendar } = require('antd/es/calendar/generateCalendar');
+
+
+function generateAccessToken(userData) {
+    return jwt.sign(userData, process.env.JWT_SECRET_KEY, { expiresIn: process.env.JWT_EXPIRATION_TIME });
+}
+
+function generateRefreshToken(userData) {
+    return jwt.sign(userData, process.env.JWT_SECRET_REFRESH_KEY, { expiresIn: '1y' });
+}
 
 
 /**

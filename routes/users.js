@@ -13,7 +13,7 @@ const { requireRole, requirePermission } = require('../middlewares/roleMiddlewar
 
 
 function generateAccessToken(userData) {
-    return jwt.sign(userData, process.env.JWT_SECRET_REFRESH_KEY, { expiresIn: process.env.JWT_EXPIRATION_TIME });
+    return jwt.sign(userData, process.env.JWT_SECRET_SECRET_KEY, { expiresIn: process.env.JWT_EXPIRATION_TIME });
 };
 
 function generateRefreshToken(userData) {
@@ -83,7 +83,7 @@ router.post('/login', async (req, res, next) => {
         // Générer un token temporaire pour la vérification 2FA
         const tempToken = jwt.sign(
             {userId: foundUser._id},
-            process.env.JWT.SECRET.KEY,
+            process.env.JWT_SECRET_KEY,
             { expiresIn: '5m'}
         );
 
@@ -222,7 +222,7 @@ router.put('/:userId', authenticateToken, requirePermission('manage_users'), asy
         const { firstname, lastname, phone, username, email } = req.body;
 
         // Vérifie si le USER est lui-même ou admin/owner
-        const isCurrentUser = req.user._id === userId;
+        const isCurrentUser = req.user._id.toString() === userId;
         const canManagerUsers = hasPermission(req.user.role, 'manage_users');
 
         if (!isCurrentUser && !canManagerUsers) {
@@ -265,7 +265,7 @@ router.put('/:userId', authenticateToken, requirePermission('manage_users'), asy
                 _id: user._id,
                 firstname: user.firstname,
                 lastname: user.lastname,
-                email: user.eamil,
+                email: user.email,
                 phone: user.phone,
                 username: user.username,
                 role: user.role

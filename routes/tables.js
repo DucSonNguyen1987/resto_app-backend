@@ -23,6 +23,7 @@ router.get('/', authenticateToken, requirePermission('view_floor_plan'), async (
         const { floorPlan, status, minCapacity } = req.query;
 
         // Construire les critères de filtrage
+        const filter = {};
 
         if (floorPlan) {
             filter.floorPlan = floorPlan;
@@ -39,7 +40,7 @@ router.get('/', authenticateToken, requirePermission('view_floor_plan'), async (
         // Récupérer les tables avec les filtres
         const tables = await Table.find(filter)
         .populate('floorPlan', 'name')
-        .populatte('lastModifiedBy', 'username firstname lastname')
+        .populate('lastModifiedBy', 'username firstname lastname')
 
         res.json({result :true , data: tables});
     } catch(error){
@@ -256,7 +257,7 @@ router.delete('/:tableId', authenticateToken, requirePermission('edit_floor_plan
  * Necessite 'move_tables'
  */
 
-router.patch('/:tableID:position', authenticateToken, requirePermission('move_tables'), async(req, res) => {
+router.patch('/:tableId/position', authenticateToken, requirePermission('move_tables'), async(req, res) => {
     try {
         const {tabelId } = req.params;
         const { position, rotation} = req.body;
@@ -402,7 +403,7 @@ router.patch('/batch', authenticateToken, requirePermission('edit_floor_plan'), 
         // Créer les tables
         const createdTables = await Table.insertMany(tablesToCreate);
 
-        res.staut(201).json({
+        res.status(201).json({
             result: true,
             message: `${createdTables.length} tables créées avec succès`,
             data: createdTables

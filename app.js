@@ -38,9 +38,9 @@ app.use((err, req, res, next) => {
 })
 
 // Démarrage du serveur
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-    console.log(`Serveur démarré sur le port ${port}`);
-})
+// const port = process.env.PORT || 3000;
+// app.listen(port, () => {
+//     console.log(`Serveur démarré sur le port ${port}`);
+// })
 
 module.exports = app;

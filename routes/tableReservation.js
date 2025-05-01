@@ -386,7 +386,7 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
 
             if(!reservation) {
                 return res.status(404).json({result: false, error: 'Réservation non trouvée'});
-            }
+            };
 
             // Vérifier que la réeservation est en attente
             if(reservation.status !== 'pending') {
@@ -394,7 +394,7 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
                     result: false,
                     error: `Cette réservation est déjà ${reservation.status}`
                 });
-            }
+            };
 
             // MAJ du statut
             reservation.status ='confirmed';
@@ -584,6 +584,14 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
                     {startTime: {$gte: startDateTime}, endTime: {$lte: endDateTime}}
                 ]
             }).populate('tables', 'number capacity');
+
+            // Créer un ensemble des IDS de tables réservées
+            const  reservedTableIds = new Set();
+            existingReservations.forEach(reservation => {
+                reservation.tables.forEach(table=> {
+                    reservedTableIds.add(table._id.toString());
+                });
+            });
 
             // Identifier les tables disponibles 
             const availableTables = allTables.filter( table => !reservedTableIds.has(table._id.toString()) && (guests ? table.capacity >= parseInt(guests) : true));
