@@ -13,7 +13,7 @@ const { requireRole, requirePermission } = require('../middlewares/roleMiddlewar
 
 
 function generateAccessToken(userData) {
-    return jwt.sign(userData, process.env.JWT_SECRET_SECRET_KEY, { expiresIn: process.env.JWT_EXPIRATION_TIME });
+    return jwt.sign(userData, process.env.JWT_SECRET_KEY, { expiresIn: process.env.JWT_EXPIRATION_TIME });
 };
 
 function generateRefreshToken(userData) {

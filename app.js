@@ -26,9 +26,9 @@ app.use(helmet());
 
 //app.use('/', indexRouter);
 app.use('/users', userRouter);
-//app.use('/floor-plans', floorPlanRouter);
-//app.use('/tables', tableRouter);
-//app.use('/reservations', tableReservationRouter);
+app.use('/floor-plans', floorPlanRouter);
+app.use('/tables', tableRouter);
+app.use('/reservations', tableReservationRouter);
 app.use('/2fa', twoFactorAuthRoutes)
 
 // Gestion d'erreur
