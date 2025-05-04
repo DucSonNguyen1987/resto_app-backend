@@ -6,14 +6,14 @@ const Table = require('../models/tables.js');
 const FloorPlan = require('../models/floorPlan.js');
 const TableReservation = require('../models/Tablereservations.js');
 
-// middlewares
+// Middlewares
 const authenticateToken = require('../middlewares/authMiddleware.js');
 const { requirePermission } = require('../middlewares/roleMiddleware.js');
 const { checkBody } = require('../modules/checkBody.js');
 
 
 /**
- * Obtenir toutes les tables ( avec filtres optionnels)
+ * Obtenir toutes les tables (avec filtres optionnels)
  * GET /tables?floorPlan=id&status=free
  * Necessite 'view_floor_plan'
 */
@@ -42,9 +42,9 @@ router.get('/', authenticateToken, requirePermission('view_floor_plan'), async (
         .populate('floorPlan', 'name')
         .populate('lastModifiedBy', 'username firstname lastname')
 
-        res.json({result :true , data: tables});
+        res.json({result: true, data: tables});
     } catch(error){
-        console.error('Erreur lors de la récupération des tables:', error)
+        console.error('Erreur lors de la récupération des tables:', error);
         res.status(500).json({result: false, error: 'Erreur Serveur'});
     }
 });
@@ -55,21 +55,21 @@ router.get('/', authenticateToken, requirePermission('view_floor_plan'), async (
  * Nécessite : 'view_floor_plan'
 */
 router.get('/:tableId', authenticateToken, requirePermission('view_floor_plan'), async(req, res) => {
-try {
-    const {tableId} = req.params;
+    try {
+        const {tableId} = req.params;
 
-    const table = await Table.findById(tableId)
-    .populate('floorPlan', 'name dimensions')
-    .populate ('lastModifiedBy', 'username firstanme lastname')
+        const table = await Table.findById(tableId)
+        .populate('floorPlan', 'name dimensions')
+        .populate('lastModifiedBy', 'username firstname lastname');
 
-    if(!table) {
-        return res.status(404).json({ result: false, error: 'Table non trouvée'});
+        if(!table) {
+            return res.status(404).json({ result: false, error: 'Table non trouvée'});
+        }
+        res.json({result: true, data: table});
+    } catch(error){
+        console.error('Erreur lors de la récupération de la table:', error);
+        res.status(500).json({ result: false, error: 'Erreur serveur'});
     }
-    res.json({result: true, data: table});
-} catch(error){
-    console.error('Erreur lors de la récupération des tables:', error)
-    res.status(500).json({ result: false, error : 'Erreur serveur'})
-}
 });
 
 /**
@@ -82,15 +82,16 @@ router.post('/', authenticateToken, requirePermission('edit_floor_plan'), async(
     try {
         // Vérifier les champs requis
         if(!checkBody(req.body, ['number', 'capacity', 'position', 'floorPlan'])) {
-            return res.status(400).json({ result :false, error: 'Informations manquantes'})
+            return res.status(400).json({ result: false, error: 'Informations manquantes'});
         }
 
         const { number, capacity, shape, position, status, rotation, dimensions, floorPlan} = req.body;
 
         // Check si le plan de salle existe
-        const existingPlan = await FloorPlan.findByid(floorPlan);
+        // Correction: findByid => findById
+        const existingPlan = await FloorPlan.findById(floorPlan);
         if(!existingPlan){
-            return res.status(400).json({result: false, error: ' Plan de salle non trouvé'});
+            return res.status(400).json({result: false, error: 'Plan de salle non trouvé'});
         }
 
         // Check si le numéro de table n'est pas déjà pris
@@ -99,25 +100,25 @@ router.post('/', authenticateToken, requirePermission('edit_floor_plan'), async(
         if(existingTable){
             return res.status(400).json({
                 result: false,
-                error: ` La table n°${number} est déjà pris sur ce plan`
+                error: `La table n°${number} est déjà prise sur ce plan`
             });
         }
 
         // Créer la nouvelle table
-        const newTable =new Table ({
+        const newTable = new Table({
             number,
             capacity,
             shape: shape || 'circle',
             position,
             status: status || 'free',
-            rotation : rotation || 0,
-            dimensions :dimensions || { width: 1 , height: 1},
+            rotation: rotation || 0,
+            dimensions: dimensions || { width: 1, height: 1},
             floorPlan,
             lastModifiedBy: req.user._id,
             lastModifiedAt: new Date()
         });
 
-        // Sauvegarder la new table
+        // Sauvegarder la table
         await newTable.save();
 
         res.status(201).json({
@@ -127,7 +128,7 @@ router.post('/', authenticateToken, requirePermission('edit_floor_plan'), async(
         });    
     } catch(error) {
         console.error('Erreur lors de la création de la table:', error);
-        res.status(500).json({reult: false, error: 'Erreur serveur'})
+        res.status(500).json({result: false, error: 'Erreur serveur'});
     }
 });
 
@@ -137,15 +138,15 @@ router.post('/', authenticateToken, requirePermission('edit_floor_plan'), async(
  * Necessite 'edit_floor_plan'
 */
 
-router.put('/:tableId', authenticateToken, requirePermission('edit_floor_plan'), async(req,res) => {
+router.put('/:tableId', authenticateToken, requirePermission('edit_floor_plan'), async(req, res) => {
     try {
-        const {tableId} =req.params;
+        const {tableId} = req.params;
         const {number, capacity, shape, position, status, rotation, dimensions, floorPlan} = req.body;
 
         // Récupérer la table existante
         const table = await Table.findById(tableId);
         if(!table) {
-            return res.status(404).json({result:false, error :'Table non trouvée'})
+            return res.status(404).json({result: false, error: 'Table non trouvée'});
         }
 
         // Check si le numéro changé n'est pas déjà pris
@@ -154,15 +155,15 @@ router.put('/:tableId', authenticateToken, requirePermission('edit_floor_plan'),
             const checkNumber = number || table.number;
 
             const existingTable = await Table.findOne({
-                number :checkNumber,
+                number: checkNumber,
                 floorPlan: checkFloorPlan,
                 _id: { $ne: tableId}
             });
 
             if (existingTable) {
                 return res.status(400).json({
-                    result : false,
-                    error :`La table n°${checkNumber} est déjà pris sur ce plan`
+                    result: false,
+                    error: `La table n°${checkNumber} est déjà prise sur ce plan`
                 });
             }
         }
@@ -172,7 +173,7 @@ router.put('/:tableId', authenticateToken, requirePermission('edit_floor_plan'),
             const existingPlan = await FloorPlan.findById(floorPlan);
 
             if(!existingPlan) {
-                return res.status(404).json({ result: false, error :'Plan de salle non trouvé'})
+                return res.status(404).json({ result: false, error: 'Plan de salle non trouvé'});
             }
         }
 
@@ -186,7 +187,7 @@ router.put('/:tableId', authenticateToken, requirePermission('edit_floor_plan'),
         if(dimensions) table.dimensions = dimensions;
         if(floorPlan) table.floorPlan = floorPlan;
 
-        // enregistrer qui a fait la modification
+        // Enregistrer qui a fait la modification
         table.lastModifiedBy = req.user._id;
         table.lastModifiedAt = new Date();
 
@@ -199,8 +200,8 @@ router.put('/:tableId', authenticateToken, requirePermission('edit_floor_plan'),
             data: table
         });
     } catch(error) {
-        console.error('Erreur lors de la modification de la table:', error)
-        res.status(500).json({ result: false, error : 'Erreur serveur'})
+        console.error('Erreur lors de la modification de la table:', error);
+        res.status(500).json({ result: false, error: 'Erreur serveur'});
     }
 });
 
@@ -212,42 +213,42 @@ router.put('/:tableId', authenticateToken, requirePermission('edit_floor_plan'),
 
 router.delete('/:tableId', authenticateToken, requirePermission('edit_floor_plan'), async(req, res) => {
     try {
-        const { tableId} = req.params;
+        const { tableId } = req.params;
 
         // Check si la table existe
         const table = await Table.findById(tableId);
 
         if(!table) {
-            return res.status(404).json({ result: false, error: 'Table non trouvée'})
+            return res.status(404).json({ result: false, error: 'Table non trouvée'});
         }
 
         // Check si la table a des reservations à venir
-
         const now = new Date();
-        const futureReservations = TableReservation.find({
-            tables :tableId,
-            endTime : {$gt: now},
-            status : { $in: ['pending', 'confirmed']}
+        const futureReservations = await TableReservation.find({
+            tables: tableId,
+            endTime: { $gt: now },
+            status: { $in: ['pending', 'confirmed'] }
         });
 
-        if (futureReservations.length > 0){
+        if (futureReservations.length > 0) {
             return res.status(400).json({
-                result : false,
-                error :'Cette Table a des réservations à venir. Veuillez d\'abord annuler ces réservations.',
-                reservations : futureReservations
+                result: false,
+                error: 'Cette Table a des réservations à venir. Veuillez d\'abord annuler ces réservations.',
+                reservations: futureReservations
             });
         }
 
+        // Correction: TAble => Table
         // Supprimer la table
-        await TAble.findByIdAndDelete(tableId);
+        await Table.findByIdAndDelete(tableId);
 
-        res.json ({
+        res.json({
             result: true,
-            mesage : 'Table supprimée avec succès'
+            message: 'Table supprimée avec succès'
         });
-    } catch(error){
-        console.error('Erreur lors de la suppression de la table:', error)
-        res.status(500).json({result : false, error : 'Erreur serveur'})
+    } catch(error) {
+        console.error('Erreur lors de la suppression de la table:', error);
+        res.status(500).json({ result: false, error: 'Erreur serveur'});
     }
 });
 
@@ -262,18 +263,18 @@ router.patch('/:tableId/position', authenticateToken, requirePermission('move_ta
         const {tableId } = req.params;
         const { position, rotation} = req.body;
 
-        // Veirfier les données 
-        if(!position || typeof position.x !== 'number' || typeof position.y !=='number') {
+        // Vérifier les données 
+        if(!position || typeof position.x !== 'number' || typeof position.y !== 'number') {
             return res.status(400).json({
                 result: false,
-                error: 'Position invalide. Format attendu {x : number, y : number }'
-            })
+                error: 'Position invalide. Format attendu {x: number, y: number}'
+            });
         }
 
         // Trouver la table
         const table = await Table.findById(tableId);
         if(!table) {
-            return res.status(404).json({ result: false, error: 'Tables non trouvée'})
+            return res.status(404).json({ result: false, error: 'Table non trouvée'});
         }
 
         // MAJ la position et éventuellement la rotation
@@ -284,7 +285,7 @@ router.patch('/:tableId/position', authenticateToken, requirePermission('move_ta
 
         // Enregistrer qui a fait la modification
         table.lastModifiedBy = req.user._id;
-        table.lastModifiedAt = new Date ();
+        table.lastModifiedAt = new Date();
 
         await table.save();
 
@@ -293,9 +294,9 @@ router.patch('/:tableId/position', authenticateToken, requirePermission('move_ta
             message: 'Position de la table mise à jour',
             data: table
         });
-    } catch( error) {
-        console.error('Erreur lors du déplacement de la table:', error)
-        res.status(500).json({ result: false, error: 'Erreur serveur'})
+    } catch(error) {
+        console.error('Erreur lors du déplacement de la table:', error);
+        res.status(500).json({ result: false, error: 'Erreur serveur'});
     }
 });
 
@@ -306,7 +307,7 @@ router.patch('/:tableId/position', authenticateToken, requirePermission('move_ta
  * Necessite 'edit_reservation'
  */
 
-router.patch('/:tableId/stauts', authenticateToken, requirePermission('edit_reservation'), async(req, res) => {
+router.patch('/:tableId/status', authenticateToken, requirePermission('edit_reservation'), async(req, res) => {
     try {
         const {tableId} = req.params;
         const {status} = req.body;
@@ -314,8 +315,8 @@ router.patch('/:tableId/stauts', authenticateToken, requirePermission('edit_rese
         // Check si le status est valide
         if(!status || !['free', 'occupied', 'reserved'].includes(status)) {
             return res.status(400).json({
-                result : false,
-                error: 'Statut Invalide. Les valeurs acceptées sont: free, reservd ou occupied'
+                result: false,
+                error: 'Statut invalide. Les valeurs acceptées sont: free, reserved ou occupied'
             });
         }
 
@@ -323,7 +324,7 @@ router.patch('/:tableId/stauts', authenticateToken, requirePermission('edit_rese
         const table = await Table.findById(tableId);
 
         if(!table) {
-            return res.status(404).json({ result: false, error: 'Table non trouvée'})
+            return res.status(404).json({ result: false, error: 'Table non trouvée'});
         }
 
         // MAJ du statut
@@ -334,37 +335,37 @@ router.patch('/:tableId/stauts', authenticateToken, requirePermission('edit_rese
         await table.save();
         res.json({
             result: true,
-            message: `Les statut de la table a été changé en ${status}`,
+            message: `Le statut de la table a été changé en ${status}`,
             data: table
         });
-    } catch( error) {
-        console.error('Erreur lors du changement de statut de la table:', error)
+    } catch(error) {
+        console.error('Erreur lors du changement de statut de la table:', error);
         res.status(500).json({ result: false, error: 'Erreur serveur' });
     }
 });
 
 /**
  * Créer plusieurs tables d'un coup
- * POST tables/batch
+ * POST /tables/batch
  * Nécessite 'edit_floor_plan'
 */
 
-router.patch('/batch', authenticateToken, requirePermission('edit_floor_plan'), async(req, res)=> {
+router.post('/batch', authenticateToken, requirePermission('edit_floor_plan'), async(req, res) => {
     try {
         const {tables, floorPlanId} = req.body;
 
         // Check les données
-        if(!tables || Array.isArray(tables) || tables.length ===0 ) {
+        if(!tables || !Array.isArray(tables) || tables.length === 0) {
             return res.status(400).json({
-                result :false,
-                error : 'Aucune table fournie'
-            })
+                result: false,
+                error: 'Aucune table fournie'
+            });
         }
 
         if(!floorPlanId) {
             return res.status(400).json({
                 result: false,
-                error :'L\'Id du plan de salle est obligatoire'
+                error: 'L\'ID du plan de salle est obligatoire'
             });
         }
 
@@ -373,29 +374,29 @@ router.patch('/batch', authenticateToken, requirePermission('edit_floor_plan'), 
         if(!floorPlan) {
             return res.status(404).json({
                 result: false,
-                error :'Plan de salle non trouvé'
+                error: 'Plan de salle non trouvé'
             });
         }
 
         // Récupérer les numéros de table existants dans ce plan
-        const existingTables = await Table.find( { floorPlan: floorPlanId}, 'number');
+        const existingTables = await Table.find({ floorPlan: floorPlanId}, 'number');
         const existingNumbers = existingTables.map(t => t.number);
 
-        // vérifier les conflits de numéros
+        // Vérifier les conflits de numéros
         const newNumbers = tables.map(t => t.number);
         const duplicateNumbers = newNumbers.filter((num, idx) => newNumbers.indexOf(num) !== idx || existingNumbers.includes(num));
 
-        if (duplicateNumbers.length > 0 ) {
+        if (duplicateNumbers.length > 0) {
             return res.status(400).json({
                 result: false,
-                error :`Numéros de table en conflit: ${duplicateNumbers.join(', ')}`
+                error: `Numéros de table en conflit: ${duplicateNumbers.join(', ')}`
             });
         }
 
         // Préparer les objets de table à créer
         const tablesToCreate = tables.map(table => ({
             ...table,
-            floorPlan : floorPlanId,
+            floorPlan: floorPlanId,
             lastModifiedBy: req.user._id,
             lastModifiedAt: new Date()
         }));
@@ -409,10 +410,9 @@ router.patch('/batch', authenticateToken, requirePermission('edit_floor_plan'), 
             data: createdTables
         });
     } catch(error) {
-        console.error('Erreur lors de la création ne masse des tables:', error)
-        res.status(500).json({ result: false, error: 'Erreur serveur'})
+        console.error('Erreur lors de la création en masse des tables:', error);
+        res.status(500).json({ result: false, error: 'Erreur serveur'});
     }
 });
 
 module.exports = router;
-
