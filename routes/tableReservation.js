@@ -13,6 +13,69 @@ const {checkBody} = require ('../modules/checkBody.js');
 
 
 /**
+ * Vérifie la disponibilité des tables pour une période donnée
+ * @param {Array} tableIds - IDs des tables à vérifier
+ * @param {Date} startTime - Heure de début de la réservation
+ * @param {Date} endTime - Heure de fin de la réservation
+ * @param {String} excludeReservationId - ID de réservation à exclure (pour les modifications)
+ * @returns {Promise<Boolean>} - true si disponible, throw une erreur sinon
+ */
+async function checkTableAvailability(tableIds, startTime, endTime, excludeReservationId = null) {
+    // Convertir en objets Date si ce sont des strings
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    
+    // Vérifier que les dates sont valides
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        throw new Error('Dates de réservation invalides');
+    }
+    
+    // Vérifier que la période est cohérente
+    if (end <= start) {
+        throw new Error('L\'heure de fin doit être après l\'heure de début');
+    }
+    
+    // Construire le filtre pour trouver les réservations conflictuelles
+    const conflictFilter = {
+        tables: { $in: tableIds },
+        status: { $in: ['pending', 'confirmed'] },
+        $or: [
+            // Début de nouvelle réservation pendant une existante
+            { startTime: { $lte: start }, endTime: { $gt: start } },
+            // Fin de nouvelle réservation pendant une existante
+            { startTime: { $lt: end }, endTime: { $gte: end } },
+            // Nouvelle réservation englobe une existante
+            { startTime: { $gte: start, $lt: end } }
+        ]
+    };
+    
+    // Exclure la réservation en cours de modification si un ID est fourni
+    if (excludeReservationId) {
+        conflictFilter._id = { $ne: excludeReservationId };
+    }
+    
+    // Rechercher des conflits
+    const conflictingReservations = await TableReservation.find(conflictFilter)
+        .populate('tables', 'number capacity')
+        .populate('user', 'username firstname lastname');
+    
+    if (conflictingReservations.length > 0) {
+        // Créer un message d'erreur détaillé
+        const tableNumbers = conflictingReservations.map(res => 
+            res.tables.map(table => table.number).join(', ')
+        ).join(', ');
+        
+        const error = new Error(`Les tables n°${tableNumbers} sont déjà réservées pour cette période`);
+        error.conflictingReservations = conflictingReservations;
+        throw error;
+    }
+    
+    return true;
+}
+
+
+
+/**
  * Obtenir toutes les réservations (avec filtres optionnels)
  * GET /reservations?date=2023-01-01&status=confirmed
  * Nécessite: 'view_reservations'
@@ -125,9 +188,7 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
     try {
         const { startTime, endTime, tables, floorPlan, guests, specialOccasion, specialoccasionDetails, notes, customerInfo } = req.body;
 
-
         // Check les champs obligatoires
-
         if(!checkBody(req.body, ['startTime','endTime', 'tables', 'floorPlan', 'guests'])) {
             return res.status(400).json({
                 result: false,
@@ -136,7 +197,6 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
         }
 
         // Si le User est un simple client et qu'il n'a pas fourni ses informations
-
         if( req.user.role === 'USER' && !customerInfo && !req.user) {
             return res.status(400).json({
                 result: false,
@@ -145,8 +205,8 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
         }
 
         // Check si les tables existent
-        const  tableIds = Array.isArray(tables) ? tables : [tables];
-        const existingTables = await Table.find( {_id: {$in: tableIds}});
+        const tableIds = Array.isArray(tables) ? tables : [tables];
+        const existingTables = await Table.find({ _id: {$in: tableIds}});
 
         if(existingTables.length !== tableIds.length) {
             return res.status(400).json({
@@ -155,8 +215,18 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
             });
         }
 
-        // Créer une nouvelle réservation
+        // Vérifier la disponibilité des tables
+        try {
+            await checkTableAvailability(tableIds, startTime, endTime);
+        } catch (availabilityError) {
+            return res.status(409).json({
+                result: false,
+                error: availabilityError.message,
+                conflictingReservations: availabilityError.conflictingReservations
+            });
+        }
 
+        // Créer une nouvelle réservation
         const newReservation = new TableReservation({
             startTime : new Date(startTime),
             endTime : new Date (endTime),
@@ -189,20 +259,11 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
             message :'Réservation créée avec succès',
             data: newReservation
         });
-        } catch (error) {
-            // Gérer spécifiquement l'erreur de conflit de réservation
-            if(error.message && error.message.includes ('déjà réservées')) {
-                return res.status(409).json({
-                    result: false,
-                    error: error.message,
-                    conflictingReservations : error.conflictingReservations
-                });
-            }
-
-            console.error('Erreur lors de la création de la réservation:', error);
-            res.status(500).json({ result: false, error: 'Erreur serveur'});
-        }
-    });
+    } catch (error) {
+        console.error('Erreur lors de la création de la réservation:', error);
+        res.status(500).json({ result: false, error: 'Erreur serveur'});
+    }
+});
 
     /**
      * Modifier une réservation existante
@@ -212,27 +273,27 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
 
     router.put('/:reservationId', authenticateToken, async(req, res) => {
         try {
-            const { reservationId} =req.params;
+            const { reservationId } = req.params;
             const { startTime, endTime, tables, guests, specialOccasion, specialoccasionDetails, notes, status} = req.body;
-
+    
             // Trouver la réservation
             const reservation = await TableReservation.findById(reservationId);
-
+    
             if(!reservation) {
                 return res.status(404).json({ result: false, error : 'Réservation non trouvée'})
             }
-
+    
             // Vérifier les autorisations 
             const isOwner = reservation.user && reservation.user.toString() === req.user._id.toString();
             const canEdit = req.user.role === 'ADMIN' || req.user.role === 'OWNER' || req.user.role === 'MANAGER' || isOwner;
-
+    
             if(!canEdit) {
                 return res.status(403).json({
                     result: false,
                     error: 'Vous n\'êtes pas autorisé(e) à modifier cette réservation'
                 });
             }
-
+    
             // les clients ne peuvent pas changer le statut
             if(status && req.user.role === 'USER' && !hasPermission(req.user.role, 'edit_reservation')) {
                 return res.status(403).json({
@@ -240,65 +301,80 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
                     error: 'Vous n\êtes pas autorisé(e) à changer le statut de la réservation'
                 });
             }
-
-            // MAJ des champs 
-            if (startTime) reservation.startTime = new Date(startTime);
-            if(endTime) reservation.endTime = new  Date(endTime);
-            if(guests) reservation.guests = guests;
-            if (specialOccasion) reservation.specialOccasion = specialOccasion;
-            if(specialoccasionDetails !== undefined) reservation.specialoccasionDetails = specialoccasionDetails;
-            if(notes !== undefined) reservation.notes = notes;
-
-            // Changement de tables
+    
+            // Préparer les nouvelles valeurs
+            const updatedStartTime = startTime ? new Date(startTime) : reservation.startTime;
+            const updatedEndTime = endTime ? new Date(endTime) : reservation.endTime;
+            
+            // Si les tables changent, vérifier la disponibilité
+            let updatedTableIds = reservation.tables;
             if (tables) {
-                const tableIds = Array.isArray(tables) ? tables : [tables];
-
+                updatedTableIds = Array.isArray(tables) ? tables : [tables];
+                
                 // Vérifier que les tables existent 
-                const existingTables = await Table.find( { _id: {$in: tableIds}});
-
-                if(existingTables.length !== tableIds.length) {
-                    return res.status (400).json({
-                        result : false,
+                const existingTables = await Table.find({ _id: {$in: updatedTableIds}});
+    
+                if(existingTables.length !== updatedTableIds.length) {
+                    return res.status(400).json({
+                        result: false,
                         error :'Une ou plusieurs tables spécifiées n\'existent pas'
                     });
                 }
-
-                reservation.tables = tableIds;
+                
+                // NOUVEAU : Vérifier la disponibilité uniquement si les dates ou tables changent
+                if (tables || startTime || endTime) {
+                    try {
+                        await checkTableAvailability(updatedTableIds, updatedStartTime, updatedEndTime, reservationId);
+                    } catch (availabilityError) {
+                        return res.status(409).json({
+                            result: false,
+                            error: availabilityError.message,
+                            conflictingReservations: availabilityError.conflictingReservations
+                        });
+                    }
+                }
             }
-
-            //Enregistrer qui a fait la modification
+    
+            // MAJ des champs 
+            if (startTime) reservation.startTime = updatedStartTime;
+            if (endTime) reservation.endTime = updatedEndTime;
+            if (guests) reservation.guests = guests;
+            if (specialOccasion !== undefined) reservation.specialOccasion = specialOccasion;
+            if (specialoccasionDetails !== undefined) reservation.specialoccasionDetails = specialoccasionDetails;
+            if (notes !== undefined) reservation.notes = notes;
+            if (status) reservation.status = status;
+    
+            // Changement de tables
+            if (tables) {
+                reservation.tables = updatedTableIds;
+            }
+    
+            // Enregistrer qui a fait la modification
             reservation.lastModifiedBy = req.user._id;
-
+    
             // Sauvegarder les modifications
             await reservation.save();
-
+    
             // MAJ le statut des tables
-            if(reservation.status === 'confirmed'){
+            if (reservation.status === 'confirmed') {
                 await Table.updateMany(
-                    {_id: {$in:reservation.tables}},
-                    {$set : {status : 'reserved'}}
+                    {_id: {$in: reservation.tables}},
+                    {$set: {status: 'reserved'}}
                 );
-            } else if ( reservation.status === 'cancelled' || reservation.status === 'completed') {
+            } else if (reservation.status === 'cancelled' || reservation.status === 'completed') {
                 // Libérer les tables
                 await Table.updateMany(
-                    {_id: {$in:reservation.tables}},
+                    {_id: {$in: reservation.tables}},
                     {$set: {status: 'free'}}
                 );
             }
+            
             res.json({
                 result: true,
-                message : 'Réservation mise à jour avec succès',
+                message: 'Réservation mise à jour avec succès',
                 data: reservation
             });
-        } catch(error) {
-            // gérer spécifiquement l'erreur de conflit de réservation
-            if(error.message && error.message.includes('déjà réservées')) {
-                return res.status(409).json({
-                    result: false,
-                    error: error.message,
-                    conflictingReservations: error.conflictingReservations
-                });
-            }
+        } catch (error) {
             console.error('Erreur lors de la modification de la réservation', error);
             res.status(500).json({ result: false, error: 'Erreur serveur'})
         }
@@ -530,8 +606,8 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
 
     router.get('/availability', async(req, res) => {
         try {
-            const { date, startTime, endTime, floorPlanId, guests} = req.query;
-
+            const { date, startTime, endTime, floorPlanId, guests } = req.query;
+    
             // Vérifier les champs requis
             if(!date || !startTime || !endTime || !floorPlanId) {
                 return res.status(400).json({
@@ -539,11 +615,11 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
                     error: 'Paramètres manquants : date, startTime, endTime et floorPlanId sont requis.'
                 });
             }
-
+    
             // Construire les dates de début et de fin 
-            const startDateTime = new Date (`${date}T${startTime}`);
-            const endDateTime = new Date (`${date}T${endTime}`);
-
+            const startDateTime = new Date(`${date}T${startTime}`);
+            const endDateTime = new Date(`${date}T${endTime}`);
+    
             // Vérifier que les autres dates sont valides
             if (isNaN(startDateTime) || isNaN(endDateTime)) {
                 return res.status(400).json({
@@ -551,7 +627,7 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
                     error: 'Format de date ou d\'heure invalide'
                 });
             }
-
+    
             // Vérifier que la période est cohérente
             if (endDateTime <= startDateTime) {
                 return res.status(400).json({
@@ -559,58 +635,63 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
                     error: 'L\'heure de fin doit être après l\'heure de début'
                 });
             }
-
+    
             // Trouver toutes les tables du plan de salle spécifié
-            const allTables = await Table.find( {floorPlan : floorPlanId});
-
+            const allTables = await Table.find({ floorPlan: floorPlanId });
+    
             if (allTables.length === 0) {
                 return res.status(404).json({
                     result: false,
                     error: 'Aucune table trouvée pour ce plan de salle'
                 });
             }
-
-            // Trouver toutes les réservations qui chevauchent la période demandée
-
-            const existingReservations = await TableReservation.find({
-                floorPlan : floorPlanId,
-                status: { $in: ['pending', 'confirmed']},
-                $or : [
+    
+            // Construire le filtre pour trouver toutes les réservations qui chevauchent la période demandée
+            const conflictFilter = {
+                floorPlan: floorPlanId,
+                status: { $in: ['pending', 'confirmed'] },
+                $or: [
                     // Début de nouvelle réservation pendant une existante
-                    {startTime : {$lte : startDateTime}, endTime: {$gt: startDateTime}},
+                    { startTime: { $lte: startDateTime }, endTime: { $gt: startDateTime } },
                     // Fin de nouvelle réservation pendant une existante
-                    {startTime: {$lt: startDateTime}, endTime : {$gte: endDateTime}},
+                    { startTime: { $lt: endDateTime }, endTime: { $gte: endDateTime } },
                     // Nouvelle réservation englobe une existante
-                    {startTime: {$gte: startDateTime}, endTime: {$lte: endDateTime}}
+                    { startTime: { $gte: startDateTime, $lt: endDateTime } }
                 ]
-            }).populate('tables', 'number capacity');
-
-            // Créer un ensemble des IDS de tables réservées
-            const  reservedTableIds = new Set();
+            };
+    
+            const existingReservations = await TableReservation.find(conflictFilter)
+                .populate('tables', 'number capacity');
+    
+            // Créer un ensemble des IDs de tables réservées
+            const reservedTableIds = new Set();
             existingReservations.forEach(reservation => {
-                reservation.tables.forEach(table=> {
+                reservation.tables.forEach(table => {
                     reservedTableIds.add(table._id.toString());
                 });
             });
-
+    
             // Identifier les tables disponibles 
-            const availableTables = allTables.filter( table => !reservedTableIds.has(table._id.toString()) && (guests ? table.capacity >= parseInt(guests) : true));
-
+            const availableTables = allTables.filter(table => 
+                !reservedTableIds.has(table._id.toString()) && 
+                (guests ? table.capacity >= parseInt(guests) : true)
+            );
+    
             res.json({
-                result : true,
-                data : {
+                result: true,
+                data: {
                     date: date,
                     startTime: startTime,
                     endTime: endTime,
-                    floorPlan :floorPlanId,
+                    floorPlan: floorPlanId,
                     availableTables: availableTables,
-                    totalTables : allTables.length,
+                    totalTables: allTables.length,
                     availableTablesCount: availableTables.length
                 }
             });
         } catch (error) {
-            console.error ('Erreur lors de la vérification de disponibilité:', error);
-            res.status(500).json({result: false, error: 'Erreur serveur'})
+            console.error('Erreur lors de la vérification de disponibilité:', error);
+            res.status(500).json({ result: false, error: 'Erreur serveur' })
         }
     });
 

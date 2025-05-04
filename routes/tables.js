@@ -238,7 +238,6 @@ router.delete('/:tableId', authenticateToken, requirePermission('edit_floor_plan
             });
         }
 
-        // Correction: TAble => Table
         // Supprimer la table
         await Table.findByIdAndDelete(tableId);
 

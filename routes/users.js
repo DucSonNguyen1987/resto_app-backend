@@ -108,7 +108,11 @@ router.post('/login', async (req, res, next) => {
     foundUser.refreshToken = refreshToken;
     const result = await foundUser.save();
     // Send Response with user data
-    res.json({ result: true, data: { username, email, firstname, lastname, phone, role, accessToken, refreshToken } });
+    res.json({ 
+        result: true,
+        accessToken, 
+        refreshToken,
+         user: { username, email, firstname, lastname, phone, role, _id: foundUser._id} });
 });
 
 

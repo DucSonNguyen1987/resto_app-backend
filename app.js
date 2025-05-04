@@ -53,7 +53,7 @@ app.use('/users', userRouter);
 app.use('/floorPlans', floorPlanRouter);
 app.use('/tables', tableRouter);
 app.use('/reservations', tableReservationRouter);
-app.use('/2fa', twoFactorAuthRoutes);
+app.use('/users/2fa', twoFactorAuthRoutes);
 
 // Gestion d'erreur
 app.use((err, req, res, next) => {

@@ -37,10 +37,10 @@ function generateBackupCodes(count = 8, length = 10) {
  * GET /2fa/setup
  * Nécessite: être authentifié
  */
-router.get('/setup', authenticateToken, async(req, res) => {
+router.get('/setup', authenticateToken, async (req, res) => {
     try {
         console.log('2FA Setup requested by user:', req.user);
-        
+
         // Vérifier si l'utilisateur est ADMIN ou OWNER
         if (req.user.role !== 'ADMIN' && req.user.role !== 'OWNER') {
             console.log('2FA Setup rejected - user role:', req.user.role);
@@ -51,26 +51,36 @@ router.get('/setup', authenticateToken, async(req, res) => {
         }
 
         console.log('2FA Setup permitted - generating secret');
-        
+
         // Générer un secret 2FA
         const secret = speakeasy.generateSecret({
-            name: `Resto App - ${req.user.email}`
+            name: `Restaurant Manager ${req.user.email}`
         });
 
-        // Générer un QR code
-        const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
+        // Trouver l'utilisateur dans la base de données
+        const user = await User.findOne({ email: req.user.email });
+        if (!user) {
+            return res.status(404).json({
+                result: false,
+                error: 'Utilisateur non trouvé'
+            });
+        }
 
-        // Sauvegarder temporairement le secret dans la session du USER (secret activé qu'après validation)
-        const user = await User.findById(req.user._id);
+        // Stocker le secret temporairement (non activé)
         user.twoFactorSecret = secret.base32;
+        user.twoFactorTempSecret = secret.base32;
         await user.save();
+
+        // Générer l'URL pour le QR code
+        const otpauthUrl = secret.otpauth_url;
 
         res.json({
             result: true,
             data: {
+                secret: secret.base32, // Secret sera affiché au USER pour une saisie manuelle
                 qrCode: qrCodeUrl,
-                secret: secret.base32 // Secret sera affiché au USER pour une saisie manuelle
-            }
+                otpauthUrl: secret.otpauthUrl
+            }   
         });
     } catch (error) {
         console.error('Erreur lors de la configuration 2FA:', error);
@@ -78,12 +88,69 @@ router.get('/setup', authenticateToken, async(req, res) => {
     }
 });
 
+// Vérifier le code OTP fourni par l'utilisateur lors de la configuration
+router.post('/verify-setup', authenticateToken, async (req, res) => {
+    try {
+      const { code } = req.body;
+      
+      // Trouver l'utilisateur dans la base de données
+      const user = await User.findOne({ email: req.user.email });
+      if (!user || !user.twoFactorTempSecret) {
+        return res.status(400).json({
+          result: false,
+          error: 'Configuration 2FA non initiée'
+        });
+      }
+  
+      // Vérifier le code OTP
+      const verified = speakeasy.totp.verify({
+        secret: user.twoFactorTempSecret,
+        encoding: 'base32',
+        token: code,
+        window: 1 // Permet une fenêtre de 30 secondes avant/après
+      });
+  
+      if (!verified) {
+        return res.status(400).json({
+          result: false,
+          error: 'Code invalide'
+        });
+      }
+  
+      // Activer la 2FA pour l'utilisateur
+      user.twoFactorEnabled = true;
+      user.twoFactorTempSecret = null;
+
+       // Générer des codes de secours
+    const backupCodes = [];
+    for (let i = 0; i < 8; i++) {
+      backupCodes.push(crypto.randomBytes(4).toString('hex'));
+    }
+    user.backupCodes = backupCodes;
+
+    await user.save();
+
+    res.json({
+      result: true,
+      data: {
+        backupCodes
+      }
+    });
+  } catch (error) {
+    console.error('Erreur lors de la vérification 2FA:', error);
+    res.status(500).json({
+      result: false,
+      error: 'Erreur lors de la vérification 2FA'
+    });
+  }
+});
+
 /**
  * Vérifie et active le 2FA après la configuration
  * POST /2fa/verify
  * Nécessite: être authentifié
  */
-router.post('/verify', authenticateToken, async(req, res) => {
+router.post('/verify', authenticateToken, async (req, res) => {
     try {
         // Vérifier le token fourni
         if (!checkBody(req.body, ['token'])) {
@@ -128,7 +195,7 @@ router.post('/verify', authenticateToken, async(req, res) => {
 
         // Activer le 2FA pour l'utilisateur
         user.twoFactorEnabled = true;
-        
+
         // Générer des codes de secours si nécessaire
         if (!user.twoFactorBackupCodes || user.twoFactorBackupCodes.length === 0) {
             user.twoFactorBackupCodes = generateBackupCodes();
@@ -140,6 +207,7 @@ router.post('/verify', authenticateToken, async(req, res) => {
             result: true,
             message: 'Authentification à deux facteurs activée avec succès',
             data: {
+
                 backupCodes: user.twoFactorBackupCodes
             }
         });
@@ -154,34 +222,34 @@ router.post('/verify', authenticateToken, async(req, res) => {
 
 /**
  * Vérifie et active le 2FA lors de la connexion
- * POST 2fa/login-verify
+ * POST 2fa/verify
  * Nécessite un token temporaire lors de la tentative de connexion
  */
-router.post('/login-verify', async(req, res) => {
+router.post('/verify', async (req, res) => {
     try {
         // Vérifier les paramètres
-        if(!checkBody(req.body, ['tempToken', 'token'])) {
+        if (!checkBody(req.body, ['tempToken', 'token'])) {
             return res.status(400).json({
                 result: false,
                 error: 'Token temporaire ou code 2FA manquant'
             });
         }
 
-        const {tempToken, token} = req.body;
+        const { tempToken, token } = req.body;
 
         // Vérifier le tempToken
         let userId;
         try {
             const decoded = jwt.verify(tempToken, process.env.JWT_SECRET_KEY);
             userId = decoded.userId;
-        } catch(error){
-            return res.status(401).json({ result: false, error: 'Token temporaire invalide ou expiré'});
+        } catch (error) {
+            return res.status(401).json({ result: false, error: 'Token temporaire invalide ou expiré' });
         }
 
         // Trouver l'utilisateur
         const user = await User.findById(userId);
-        if(!user || user.tempToken !== tempToken) {
-            return res.status(401).json({ result: false, error: 'Token temporaire invalide'});
+        if (!user || user.tempToken !== tempToken) {
+            return res.status(401).json({ result: false, error: 'Token temporaire invalide' });
         }
 
         // Vérifier si c'est un code de secours
@@ -198,7 +266,7 @@ router.post('/login-verify', async(req, res) => {
             });
 
             if (!verified) {
-                return res.status(400).json({ result: false, error: 'Code 2FA invalide'});
+                return res.status(400).json({ result: false, error: 'Code 2FA invalide' });
             }
         }
 
@@ -214,7 +282,7 @@ router.post('/login-verify', async(req, res) => {
         };
 
         const accessToken = generateAccessToken(userData);
-        const refreshToken = generateRefreshToken({email: user.email});
+        const refreshToken = generateRefreshToken({ email: user.email });
 
         // Mettre à jour les tokens de l'utilisateur
         user.accessToken = accessToken;
@@ -231,9 +299,9 @@ router.post('/login-verify', async(req, res) => {
                 refreshToken
             }
         });
-    } catch(error) {
+    } catch (error) {
         console.error('Erreur lors de la vérification 2FA pour login:', error);
-        res.status(500).json({result: false, error: 'Erreur serveur'});
+        res.status(500).json({ result: false, error: 'Erreur serveur' });
     }
 });
 
@@ -242,7 +310,7 @@ router.post('/login-verify', async(req, res) => {
  * POST /2fa/disable
  * Nécessite: être authentifié
  */
-router.post('/disable', authenticateToken, async(req, res) => {
+router.post('/disable', authenticateToken, async (req, res) => {
     try {
         // Vérifier si l'utilisateur a fourni son mot de passe pour confirmer
         if (!checkBody(req.body, ['password'])) {
@@ -283,7 +351,7 @@ router.post('/disable', authenticateToken, async(req, res) => {
         user.twoFactorEnabled = false;
         user.twoFactorSecret = null;
         user.twoFactorBackupCodes = [];
-        
+
         await user.save();
 
         res.json({
@@ -304,7 +372,7 @@ router.post('/disable', authenticateToken, async(req, res) => {
  * POST /2fa/generate-backup-codes
  * Nécessite être authentifié
  */
-router.post('/generate-backup-codes', authenticateToken, async(req, res) => {
+router.post('/generate-backup-codes', authenticateToken, async (req, res) => {
     try {
         const user = await User.findById(req.user._id);
 
@@ -327,9 +395,9 @@ router.post('/generate-backup-codes', authenticateToken, async(req, res) => {
                 backupCodes: user.twoFactorBackupCodes
             }
         });
-    } catch(error) {
+    } catch (error) {
         console.error('Erreur lors de la génération de codes de secours:', error);
-        res.status(500).json({ result: false, error: 'Erreur serveur'});
+        res.status(500).json({ result: false, error: 'Erreur serveur' });
     }
 });
 
@@ -338,7 +406,7 @@ router.post('/generate-backup-codes', authenticateToken, async(req, res) => {
  * GET /2fa/status
  * Nécessite: être authentifié
  */
-router.get('/status', authenticateToken, async(req, res) => {
+router.get('/status', authenticateToken, async (req, res) => {
     try {
         const user = await User.findById(req.user._id);
 
