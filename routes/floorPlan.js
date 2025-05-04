@@ -12,7 +12,7 @@ const {checkBody} = require ('../modules/checkBody.js');
 
 /**
  * Obtenir tous les plans de salle
- * GET /flooPlans
+ * GET /floorplans
  * Nécessite: view_floor_plan
 */
 
@@ -72,7 +72,7 @@ router.get('/:floorPlanId', authentificateToken, requirePermission('view_floor_p
 router.post('/', authentificateToken, requirePermission('create_floor_plan'), async(req,res) => {
     try {
         // Vérifier les champs requis
-        if(!checkBody(req.body, ['name', 'dimensions'])) {
+        if(!checkBody(req.body, ['name'])) {
             return res.status(400).json({ result :false, error :'Informations manquantes'})
         }
 
@@ -128,7 +128,7 @@ router.put('/:floorPlanId', authentificateToken, requirePermission('edit_floor_p
         }
 
         // Check si le USER peut modifier ce plan
-        if (!floorPlan.canBeModifiedBy(req.user)) {
+        if (!floorPlan.canbeModifiedBy(req.user)) {
             return res.status(403).json({result: false, error : 'Vous n\'avez pas des doits de modifier ce plan '});
         }
 
@@ -182,7 +182,7 @@ router.delete('/:floorPlanId', authentificateToken, requirePermission('edit_floo
         }
 
         // Check si le USER a la permission pour supprimer
-        if(!floorPlan.canBeModifiedBy(req.user) && req.user.role !=='ADMIN') {
+        if(!floorPlan.canbeModifiedBy(req.user) && req.user.role !=='ADMIN') {
             return res.status(403).json( { result: false, error : 'Vous n\'avez pas les droits de supprimer ce plan'});
         }
 
@@ -237,7 +237,7 @@ router.patch('/:floorPlanId/status', authentificateToken, requirePermission('edi
         }
 
         // Check les permissions
-        if (!floorPlan.canBeModifiedBy(req.user)) {
+        if (!floorPlan.canbeModifiedBy(req.user)) {
             return res.status(403).json({
                 result: false,
                 error : 'Vous n\'avez pas le droit de modifier ce plan '
@@ -283,7 +283,7 @@ router.post('/:floorPlanId/obstacles', authentificateToken, requirePermission('e
         }
 
         // Vérifier les permissions
-        if(!floorPlan.canBeModifiedBy(req.user)) {
+        if(!floorPlan.canbeModifiedBy(req.user)) {
             return res.status(403).json({ result :false, error : 'Vous n\'avez pas la permission pour modifier ce plan'});
         }
 

@@ -189,14 +189,14 @@ router.post('/refreshToken', async (req, res) => {
 
 // Obtenir tous les utilisateurs - nécessite la permission "manage_users"
 // GET
-router.get('/all', authenticateToken, requirePermission('manage_users', async (req, res) => {
+router.get('/all', authenticateToken, requirePermission('manage_users'), async (req, res) => {
     try {
         const users = await User.find({}, '-password -refreshToken -accessToken');
         res.json({ result: true, data: users });
     } catch (error) {
         res.status(500).json({ result: false, error: 'Erreur serveur' })
     }
-}));
+});
 
 // Obtenir un USER spécifique par ID  - nécessite la permission "manage_users"
 // GET
@@ -310,7 +310,7 @@ router.put('/:userId/role', authenticateToken, requirePermission('manage_users')
 
 // Reset le MDP d'un USER - nécessite la permission "manage_users"
 //POST
-router.post('/:userID/reset-password', authenticateToken, requirePermission('manage_users'), async(req, res) => {
+router.post('/:userId/reset-password', authenticateToken, requirePermission('manage_users'), async(req, res) => {
     try {
         const {userId} = req.params;
         const {newPassword} = req.body;

@@ -239,7 +239,7 @@ router.delete('/:tableId', authenticateToken, requirePermission('edit_floor_plan
         }
 
         // Supprimer la table
-        await TTable.findByIdAndDelete(tableId);
+        await TAble.findByIdAndDelete(tableId);
 
         res.json ({
             result: true,
@@ -259,7 +259,7 @@ router.delete('/:tableId', authenticateToken, requirePermission('edit_floor_plan
 
 router.patch('/:tableId/position', authenticateToken, requirePermission('move_tables'), async(req, res) => {
     try {
-        const {tabelId } = req.params;
+        const {tableId } = req.params;
         const { position, rotation} = req.body;
 
         // Veirfier les données 

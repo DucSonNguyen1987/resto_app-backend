@@ -345,7 +345,7 @@ router.post('/', authenticateToken, requirePermission('create_reservation'), asy
             // MAJ du statut et les notes
             reservation.status = 'cancelled';
             if(reason) {
-                reservation.notes = reservations.notes ? `${reservation.notes}\nAnnulation: ${reason}}` : `Annulation: ${reason}`;
+                reservation.notes = reservation.notes ? `${reservation.notes}\nAnnulation: ${reason}}` : `Annulation: ${reason}`;
             }
 
             // Enregistrer qui a fait la modification

@@ -15,7 +15,10 @@ const tableReservationRouter = require('./routes/tableReservation.js');
 const twoFactorAuthRoutes = require('./routes/twoFactorAuth.js');
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:5173', // Your frontend URL
+    credentials: true
+  }));
 
 app.use(logger('dev'));
 app.use(express.json());
@@ -26,7 +29,7 @@ app.use(helmet());
 
 //app.use('/', indexRouter);
 app.use('/users', userRouter);
-app.use('/floor-plans', floorPlanRouter);
+app.use('/floorPlans', floorPlanRouter);
 app.use('/tables', tableRouter);
 app.use('/reservations', tableReservationRouter);
 app.use('/2fa', twoFactorAuthRoutes)
